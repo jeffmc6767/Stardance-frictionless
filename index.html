@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimal Stock Tracker</title>
+  <style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        height: 100vh;
+        background: #09090b;
+        color: #e4e4e7;
+        font-family: "SFMono-Regular", Consolas, monospace;
+    }
+
+    /* HEADER */
+    header {
+        height: 70px;
+        border-bottom: 1px solid #27272a;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end; /* Pushes control elements to the right since logo is gone */
+        padding: 0 25px;
+    }
+
+    .controls {
+        display: flex;
+        gap: 8px;
+    }
+
+    input {
+        width: 260px;
+        padding: 10px 14px;
+        background: #18181b;
+        color: white;
+        border: 1px solid #27272a;
+        border-radius: 0; /* Boxy */
+        outline: none;
+        text-transform: uppercase;
+    }
+
+    input:focus {
+        border-color: #52525b;
+    }
+
+    button {
+        background: #18181b;
+        color: white;
+        border: 1px solid #27272a;
+        padding: 10px 14px;
+        border-radius: 0; /* Boxy */
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.2s ease;
+    }
+
+    button:hover {
+        background: #27272a;
+        border-color: #3f3f46;
+    }
+
+    .btn-add {
+        background: #e4e4e7;
+        color: #09090b;
+    }
+    button.btn-add:hover {
+        background: #d4d4d8;
+    }
+
+    /* MAIN */
+    main {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        height: calc(100vh - 70px);
+        gap: 20px;
+        padding: 20px;
+    }
+
+    /* WATCHLIST */
+    .watchlist-section {
+        border: 1px solid #27272a;
+        border-radius: 0; /* Boxy */
+        padding: 15px;
+        overflow: hidden;
+        background: #09090b;
+    }
+
+    h2 {
+        font-size: 11px;
+        color: #71717a;
+        letter-spacing: 2px;
+        margin-top: 0;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+    }
+
+    #watchlist {
+        overflow-y: auto;
+        height: calc(100% - 30px);
+    }
+
+    #watchlist::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    #watchlist::-webkit-scrollbar-thumb {
+        background: #3f3f46;
+        border-radius: 0; /* Boxy scrollbar thumb */
+    }
+
+    /* STOCK CARD */
+    .stock-card {
+        background: #111113;
+        border: 1px solid #27272a;
+        border-radius: 0; /* Boxy */
+        padding: 14px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: border-color 0.2s ease;
+    }
+
+    .stock-card:hover {
+        border-color: #52525b;
+    }
+
+    .stock-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .stock-symbol {
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    .stock-name {
+        color: #71717a;
+        font-size: 11px;
+        margin-top: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* CHART SECTION */
+    .chart-section {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        height: 100%;
+    }
+
+    .current {
+        background: #111113;
+        border: 1px solid #27272a;
+        border-radius: 0; /* Boxy */
+        padding: 12px;
+        min-height: 126px;
+    }
+
+    #chart {
+        flex: 1;
+        border: 1px solid #27272a;
+        border-radius: 0; /* Boxy */
+        overflow: hidden;
+        background: #111113;
+    }
+
+    @media(max-width: 800px){
+        main {
+            grid-template-columns: 1fr;
+            height: auto;
+            overflow-y: auto;
+        }
+        .watchlist-section {
+            height: 300px;
+        }
+        #chart {
+            height: 400px;
+        }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="controls">
+      <input type="text" id="symbolInput" placeholder="Symbol (e.g. AAPL or XEQT)">
+      <button id="loadButton">Find</button>
+      <button id="addButton" class="btn-add">+</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="watchlist-section">
+      <h2>Watchlist</h2>
+      <div id="watchlist"></div>
+    </section>
+
+    <section class="chart-section">
+      <div class="current">
+        <div id="stock-info"></div>
+      </div>
+      <div id="chart"></div>
+    </section>
+  </main>
+
+  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+  
+  <script type="text/javascript">
+    let watchlist = [
+        { symbol: "TSX:XEQT", name: "iShares Core Equity ETF" },
+        { symbol: "NASDAQ:AAPL", name: "Apple" },
+        { symbol: "NASDAQ:MSFT", name: "Microsoft" },
+        { symbol: "NASDAQ:NVDA", name: "NVIDIA" },
+        { symbol: "NASDAQ:GOOGL", name: "Alphabet" },
+        { symbol: "NASDAQ:AMZN", name: "Amazon" },
+        { symbol: "NASDAQ:META", name: "Meta" },
+        { symbol: "NASDAQ:TSLA", name: "Tesla" },
+        { symbol: "NASDAQ:AMD", name: "AMD" }
+    ];
+
+    const canadianSymbols = [
+        "XEQT", "VEQT", "VFV", "XIU", "SHOP", "RY", "TD", "BNS", "ENB"
+    ];
+
+    function formatSymbol(input) {
+        let symbol = input.trim().toUpperCase();
+        if (!symbol) return "";
+        if (symbol.includes(":")) return symbol;
+        if (canadianSymbols.includes(symbol)) return "TSX:" + symbol;
+        return "NASDAQ:" + symbol;
+    }
+
+    function saveWatchlist() {
+        localStorage.setItem("terminal_watchlist", JSON.stringify(watchlist));
+    }
+
+    let saved = localStorage.getItem("terminal_watchlist");
+    if (saved) {
+        try {
+            let parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].symbol) {
+                watchlist = parsed;
+            }
+        } catch(e) {
+            console.log("Invalid saved data");
+        }
+    }
+
+    function renderWatchlist() {
+        let container = document.getElementById("watchlist");
+        container.innerHTML = "";
+
+        watchlist.forEach(stock => {
+            let card = document.createElement("div");
+            card.className = "stock-card";
+
+            card.innerHTML = `
+                <div class="stock-card-header">
+                    <div class="stock-symbol">${stock.symbol.split(":")[1]}</div>
+                    <div style="font-size: 11px; color: #52525b;">${stock.symbol.split(":")[0]}</div>
+                </div>
+                <div class="stock-name">${stock.name}</div>
+            `;
+
+            card.onclick = function() {
+                loadStock(stock.symbol, stock.name);
+            };
+
+            container.appendChild(card);
+        });
+    }
+
+    function loadStock(symbol, name) {
+        document.getElementById("stock-info").innerHTML = "";
+        let info = document.createElement("script");
+        info.src = "https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js";
+        info.async = true;
+        info.innerHTML = JSON.stringify({
+            "symbol": symbol,
+            "width": "100%",
+            "height": 100,
+            "locale": "en",
+            "colorTheme": "dark",
+            "isTransparent": true
+        });
+        document.getElementById("stock-info").appendChild(info);
+
+        document.getElementById("chart").innerHTML = "";
+        let chart = document.createElement("script");
+        chart.src = "https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js";
+        chart.async = true;
+        chart.innerHTML = JSON.stringify({
+            "symbols": [[symbol]],
+            "chartOnly": true,
+            "width": "100%",
+            "height": "100%",
+            "locale": "en",
+            "colorTheme": "dark",
+            "isTransparent": true,
+            "autosize": true,
+            "showVolume": false,
+            "lineWidth": 2,
+            "dateRange": "12M"
+        });
+        document.getElementById("chart").appendChild(chart);
+    }
+
+    document.getElementById("loadButton").onclick = function() {
+        let input = document.getElementById("symbolInput").value;
+        let symbol = formatSymbol(input);
+        if (symbol) {
+            loadStock(symbol, symbol.split(":")[1]);
+        }
+    };
+
+    document.getElementById("addButton").onclick = function() {
+        let input = document.getElementById("symbolInput").value;
+        let symbol = formatSymbol(input);
+        if (!symbol) return;
+
+        if (!watchlist.some(x => x.symbol === symbol)) {
+            watchlist.push({
+                symbol: symbol,
+                name: symbol.split(":")[1]
+            });
+            saveWatchlist();
+            renderWatchlist();
+        }
+        document.getElementById("symbolInput").value = "";
+    };
+
+    window.onload = function() {
+        renderWatchlist();
+        loadStock("TSX:XEQT", "iShares Core Equity ETF");
+    };
+  </script>
+</body>
+</html>
